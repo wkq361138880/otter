@@ -20,13 +20,53 @@ import com.alibaba.otter.node.etl.common.db.dialect.AbstractSqlTemplate;
 
 /**
  * mysql sql生成模板
- * 
+ *
  * @author jianghang 2011-10-27 下午01:41:20
  * @version 4.0.0
  */
 public class MysqlSqlTemplate extends AbstractSqlTemplate {
 
     private static final String ESCAPE = "`";
+
+    /**
+     * 采用replace into,5.7 insert into onduplicate会有大量冲突
+     * @param schemaName
+     * @param tableName
+     * @param pkNames
+     * @param columnNames
+     * @param viewColumnNames
+     * @param includePks
+     * @param shardColumn
+     * @return
+     */
+    public String getMergeSql2(String schemaName, String tableName, String[] pkNames, String[] columnNames,
+                               String[] viewColumnNames, boolean includePks, String shardColumn) {
+        StringBuilder sql = new StringBuilder("replace into " + getFullName(schemaName, tableName) + "(");
+        int size = columnNames.length;
+        for (int i = 0; i < size; i++) {
+            sql.append(appendEscape(columnNames[i])).append(" , ");
+        }
+        size = pkNames.length;
+        for (int i = 0; i < size; i++) {
+            sql.append(appendEscape(pkNames[i])).append((i + 1 < size) ? " , " : "");
+        }
+
+        sql.append(") values (");
+        size = columnNames.length;
+        for (int i = 0; i < size; i++) {
+            sql.append("?").append(" , ");
+        }
+        size = pkNames.length;
+        for (int i = 0; i < size; i++) {
+            sql.append("?").append((i + 1 < size) ? " , " : "");
+        }
+        sql.append(")");
+        return sql.toString().intern();// intern优化，避免出现大量相同的字符串
+    }
+
+    protected String appendEscape(String columnName) {
+        return ESCAPE + columnName + ESCAPE;
+    }
 
     public String getMergeSql(String schemaName, String tableName, String[] pkNames, String[] columnNames,
                               String[] viewColumnNames, boolean includePks, String shardColumn) {
@@ -60,9 +100,9 @@ public class MysqlSqlTemplate extends AbstractSqlTemplate {
             }
 
             sql.append(appendEscape(columnNames[i]))
-                .append("=values(")
-                .append(appendEscape(columnNames[i]))
-                .append(")");
+                    .append("=values(")
+                    .append(appendEscape(columnNames[i]))
+                    .append(")");
             if (includePks) {
                 sql.append(" , ");
             } else {
@@ -80,10 +120,6 @@ public class MysqlSqlTemplate extends AbstractSqlTemplate {
         }
 
         return sql.toString().intern();// intern优化，避免出现大量相同的字符串
-    }
-
-    protected String appendEscape(String columnName) {
-        return ESCAPE + columnName + ESCAPE;
     }
 
 }

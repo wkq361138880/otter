@@ -24,6 +24,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import com.alibaba.otter.node.etl.model.protobuf.BatchProto;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.StringUtils;
@@ -47,7 +48,7 @@ import com.google.common.collect.Sets;
 
 /**
  * 基于http下载的pipe实现
- * 
+ *
  * @author jianghang 2011-10-13 下午06:31:13
  * @version 4.0.0
  */
@@ -57,8 +58,8 @@ public abstract class AbstractHttpPipe<T, KEY extends HttpPipeKey> implements Pi
     protected static final String             UTF_8          = "UTF-8";
     protected static final String             DATE_FORMAT    = "yyyy-MM-dd-HH-mm-ss";
     protected static ScheduledExecutorService schedulor      = Executors.newScheduledThreadPool(1,
-                                                                                                new NamedThreadFactory(
-                                                                                                                       "HttpPipe-Cleaner")); ;
+            new NamedThreadFactory(
+                    "HttpPipe-Cleaner")); ;
     protected Logger                          logger         = LoggerFactory.getLogger(this.getClass());
     protected JettyEmbedServer                jettyEmbedServer;                                                                             // 注入对象，确保server已经启动
     protected Long                            period         = DEFAULT_PERIOD;
@@ -68,6 +69,7 @@ public abstract class AbstractHttpPipe<T, KEY extends HttpPipeKey> implements Pi
     protected String                          downloadDir;                                                                                  // 下载完成后目标路径
     protected RemoteUrlBuilder                remoteUrlBuilder;
     protected DataRetrieverFactory            dataRetrieverFactory;
+    protected Integer sizeLimit;
 
     public void afterPropertiesSet() throws Exception {
         Assert.notNull(remoteUrlBuilder);
@@ -109,6 +111,8 @@ public abstract class AbstractHttpPipe<T, KEY extends HttpPipeKey> implements Pi
                 }
             }
         }, DEFAULT_PERIOD, DEFAULT_PERIOD, TimeUnit.MILLISECONDS);
+
+        BatchProto.sizeLimit = this.sizeLimit;
     }
 
     protected EncryptedData encryptFile(File file) {
@@ -215,4 +219,7 @@ public abstract class AbstractHttpPipe<T, KEY extends HttpPipeKey> implements Pi
         this.dataRetrieverFactory = dataRetrieverFactory;
     }
 
+    public void setSizeLimit(Integer sizeLimit) {
+        this.sizeLimit = sizeLimit;
+    }
 }

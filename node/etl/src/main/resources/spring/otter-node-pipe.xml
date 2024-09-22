@@ -1,20 +1,20 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <beans xmlns="http://www.springframework.org/schema/beans"
-	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xmlns:aop="http://www.springframework.org/schema/aop"
-	xmlns:tx="http://www.springframework.org/schema/tx"
-	xsi:schemaLocation="	   http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-2.0.xsd	   http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-2.0.xsd	   http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop-2.0.xsd"
-	default-autowire="byName" default-dependency-check="none">
-	
+	   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	   xmlns:aop="http://www.springframework.org/schema/aop"
+	   xmlns:tx="http://www.springframework.org/schema/tx"
+	   xsi:schemaLocation="	   http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-2.0.xsd	   http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-2.0.xsd	   http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop-2.0.xsd"
+	   default-autowire="byName" default-dependency-check="none">
+
 	<bean id="rowDataMemoryPipe" class="com.alibaba.otter.node.etl.common.pipe.impl.memory.RowDataMemoryPipe"  scope="singleton" >
 		<property name="timeout" value="600000" /> <!-- 10分钟过期,by zebin -->
 		<property name="downloadDir" value="${otter.download.dir}" />
 		<property name="retry" value="3" />
 	</bean>
-	
+
 	<bean id="rowDataPipeDelegate" class="com.alibaba.otter.node.etl.common.pipe.impl.RowDataPipeDelegate" scope="singleton">
 	</bean>
-	
+
 	<!-- http服务 -->
 	<bean id="rowDataHttpPipe" class="com.alibaba.otter.node.etl.common.pipe.impl.http.RowDataHttpPipe"  scope="singleton" >
 		<property name="timeout" value="600000" /> <!-- 10分钟过期 -->
@@ -22,6 +22,7 @@
 		<property name="htdocsDir" value="${otter.htdocs.dir}" />
 		<property name="downloadDir" value="${otter.download.dir}" />
 		<property name="remoteUrlBuilder" ref="remoteUrlBuilder" />
+		<property name="sizeLimit" value="${otter.protobuf.sizeLimit}" />
 	</bean>
 	<bean id="attachmentHttpPipe" class="com.alibaba.otter.node.etl.common.pipe.impl.http.AttachmentHttpPipe"  scope="singleton">
 		<property name="timeout" value="600000" /> <!-- 10分钟过期 -->
@@ -30,12 +31,12 @@
 		<property name="downloadDir" value="${otter.download.dir}" />
 		<property name="remoteUrlBuilder" ref="remoteUrlBuilder" />
 	</bean>
-	
+
 	<!-- rpc服务 -->
 	<bean id="rowDataRpcPipe" class="com.alibaba.otter.node.etl.common.pipe.impl.rpc.RowDataRpcPipe"  scope="singleton">
 		<property name="timeout" value="600000" /> <!-- 10分钟过期,by zebin -->
 	</bean>
-	
+
 	<!-- jetty服务 -->
 	<bean id="jettyEmbedServer" class="com.alibaba.otter.node.etl.common.jetty.JettyEmbedServer" scope="singleton">
 		<property name="config" value="jetty/jetty.xml" />
@@ -44,14 +45,14 @@
 	<bean id="remoteUrlBuilder" class="com.alibaba.otter.node.etl.common.pipe.impl.http.RemoteUrlBuilder" >
 		<property name="urlFormat" value="http://{0}:{1}/download/{2}" /><!-- 0为ip,1为port,2为下载路径  -->
 	</bean>
-	
+
 	<bean id="dataRetrieverFactory" class="com.alibaba.otter.node.etl.common.io.download.DataRetrieverFactory">
 	</bean>
-	
+
 	<!-- 池化配置 -->
 	<bean id="archiveBean" class="org.springframework.aop.framework.ProxyFactoryBean">
 		<property name="optimize" value="false"/>
-   		<property name="proxyTargetClass" value="true" />
+		<property name="proxyTargetClass" value="true" />
 		<property name="targetSource" ref="archiveBeanTargetSource" />
 	</bean>
 	<bean id="archiveBeanTargetSource" class="org.springframework.aop.target.CommonsPoolTargetSource" >

@@ -16,21 +16,35 @@
 
 package com.alibaba.otter.node.etl.select.selector;
 
+import com.alibaba.otter.canal.protocol.CanalEntry;
+import com.alibaba.otter.node.etl.select.exceptions.SelectException;
+import com.alibaba.otter.shared.etl.model.EventData;
+import com.google.protobuf.ByteString;
+import com.google.protobuf.InvalidProtocolBufferException;
+
+import java.util.ArrayList;
 import java.util.List;
 
 /**
  * 数据对象
- * 
+ *
  * @author jianghang 2012-7-31 下午02:43:08
  */
-public class Message<T> {
+public class Message {
 
-    private Long    id;
-    private List<T> datas;
+    private Long id;
+    private List<EventData> datas;
 
-    public Message(Long id, List<T> datas){
+    private com.alibaba.otter.canal.protocol.Message originalMessage;
+
+    public Message(Long id, List<EventData> datas) {
         this.id = id;
         this.datas = datas;
+    }
+
+    public Message(com.alibaba.otter.canal.protocol.Message originalMessage) {
+        this.originalMessage = originalMessage;
+        this.id = originalMessage.getId();
     }
 
     public Long getId() {
@@ -41,12 +55,23 @@ public class Message<T> {
         this.id = id;
     }
 
-    public List<T> getDatas() {
+    public List<EventData> getDatas() {
         return datas;
     }
 
-    public void setDatas(List<T> datas) {
+    public void setDatas(List<EventData> datas) {
         this.datas = datas;
     }
 
+    public boolean hasData() {
+        if (originalMessage.isRaw()) {
+            return originalMessage.getRawEntries().size() > 0;
+        } else {
+            return originalMessage.getEntries().size() > 0;
+        }
+    }
+
+    public com.alibaba.otter.canal.protocol.Message getOriginalMessage() {
+        return originalMessage;
+    }
 }

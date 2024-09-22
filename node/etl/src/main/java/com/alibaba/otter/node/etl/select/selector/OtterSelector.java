@@ -16,11 +16,13 @@
 
 package com.alibaba.otter.node.etl.select.selector;
 
+import com.alibaba.otter.shared.etl.model.EventData;
+
 import java.util.List;
 
 /**
  * otter同步数据获取
- * 
+ *
  * @author jianghang 2012-7-31 下午02:30:33
  */
 public interface OtterSelector<T> {
@@ -43,12 +45,14 @@ public interface OtterSelector<T> {
     /**
      * 获取一批待处理的数据
      */
-    public Message<T> selector() throws InterruptedException;
+    public Message selector() throws InterruptedException;
 
     /**
      * 返回未被ack的数据
      */
     public List<Long> unAckBatchs();
+
+    void parse(Message warppedMessage);
 
     /**
      * 反馈一批数据处理失败，需要下次重新被处理

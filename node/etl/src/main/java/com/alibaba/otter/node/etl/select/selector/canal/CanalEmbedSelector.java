@@ -62,7 +62,7 @@ import com.google.protobuf.InvalidProtocolBufferException;
 
 /**
  * 基于canal embed实现数据获取方式
- * 
+ *
  * @author jianghang 2012-7-31 下午02:45:15
  * @version 4.1.0
  */
@@ -114,7 +114,7 @@ public class CanalEmbedSelector implements OtterSelector {
         batchTimeout = pipeline.getParameters().getBatchTimeout();
         ddlSync = pipeline.getParameters().getDdlSync();
         final boolean syncFull = pipeline.getParameters().getSyncMode().isRow()
-                                 || pipeline.getParameters().isEnableRemedy();
+                || pipeline.getParameters().isEnableRemedy();
         // 暂时使用skip load代替
         filterTableError = pipeline.getParameters().getSkipSelectException();
         if (pipeline.getParameters().getDumpSelector() != null) {
@@ -148,9 +148,9 @@ public class CanalEmbedSelector implements OtterSelector {
                         HAMode haMode = parameters.getHaMode();
                         if (haMode.isMedia()) {
                             return new MediaHAController(parameters.getMediaGroup(),
-                                parameters.getDbUsername(),
-                                parameters.getDbPassword(),
-                                parameters.getDefaultDatabaseName());
+                                    parameters.getDbUsername(),
+                                    parameters.getDbPassword(),
+                                    parameters.getDefaultDatabaseName());
                         } else {
                             return super.initHaController();
                         }
@@ -169,7 +169,28 @@ public class CanalEmbedSelector implements OtterSelector {
                             }
 
                             MysqlEventParser mysqlEventParser = (MysqlEventParser) eventParser;
-                            mysqlEventParser.setParallel(false); // otter先使用简单的模式
+//                            mysqlEventParser.setParallel(false); // otter先使用简单的模式
+                            try {
+                                Boolean parallel = Boolean.valueOf(System.getProperty("canal.parallel","true"));
+                                mysqlEventParser.setParallel(parallel);
+                            } catch (Exception e) {
+                                logger.warn("参数canal.parallel配置错误{}",System.getProperty("canal.parallel"));
+                            }
+
+                            try {
+                                Integer bufferSize = Integer.valueOf(System.getProperty("canal.paralleBufferSize","256"));
+                                mysqlEventParser.setParallelBufferSize(bufferSize);
+                            } catch (Exception e) {
+                                logger.warn("参数canal.paralleBufferSize配置错误{}",System.getProperty("canal.paralleBufferSize"));
+                            }
+
+                            try {
+                                Integer threadSize = Integer.valueOf(System.getProperty("canal.paralleThreadSize", String.valueOf(Runtime.getRuntime().availableProcessors() * 60 / 100)));
+                                mysqlEventParser.setParallelThreadSize(threadSize);
+                            } catch (Exception e) {
+                                logger.warn("参数canal.paralleThreadSize配置错误{}",System.getProperty("canal.paralleThreadSize"));
+                            }
+
                             CanalHAController haController = mysqlEventParser.getHaController();
                             if (haController instanceof MediaHAController) {
                                 if (isGroup) {
@@ -232,7 +253,7 @@ public class CanalEmbedSelector implements OtterSelector {
         canalServer.stop();
     }
 
-    public Message<EventData> selector() throws InterruptedException {
+    public Message selector() throws InterruptedException {
         int emptyTimes = 0;
         com.alibaba.otter.canal.protocol.Message message = null;
         if (batchTimeout < 0) {// 进行轮询处理
@@ -260,8 +281,14 @@ public class CanalEmbedSelector implements OtterSelector {
                 throw new InterruptedException();
             }
         }
+        Message result = new Message(message);
+        return result;
+    }
 
-        List<Entry> entries = null;
+    @Override
+    public void parse(Message warppedMessage){
+        com.alibaba.otter.canal.protocol.Message message = warppedMessage.getOriginalMessage();
+        final List<Entry> entries;
         if (message.isRaw()) {
             entries = new ArrayList<CanalEntry.Entry>(message.getRawEntries().size());
             for (ByteString entry : message.getRawEntries()) {
@@ -274,17 +301,15 @@ public class CanalEmbedSelector implements OtterSelector {
         } else {
             entries = message.getEntries();
         }
-
         List<EventData> eventDatas = messageParser.parse(pipelineId, entries); // 过滤事务头/尾和回环数据
-        Message<EventData> result = new Message<EventData>(message.getId(), eventDatas);
         // 更新一下最后的entry时间，包括被过滤的数据
         if (!CollectionUtils.isEmpty(entries)) {
             long lastEntryTime = entries.get(entries.size() - 1).getHeader().getExecuteTime();
-            if (lastEntryTime > 0) {// oracle的时间可能为0
+            if (lastEntryTime > 0 && lastEntryTime > this.lastEntryTime) {// oracle的时间可能为0
                 this.lastEntryTime = lastEntryTime;
             }
         }
-
+        warppedMessage.setDatas(eventDatas);
         if (dump && logger.isInfoEnabled()) {
             String startPosition = null;
             String endPosition = null;
@@ -293,9 +318,8 @@ public class CanalEmbedSelector implements OtterSelector {
                 endPosition = buildPositionForDump(entries.get(entries.size() - 1));
             }
 
-            dumpMessages(result, startPosition, endPosition, entries.size());// 记录一下，方便追查问题
+            dumpMessages(warppedMessage, startPosition, endPosition, entries.size());// 记录一下，方便追查问题
         }
-        return result;
     }
 
     public void rollback(Long batchId) {
@@ -368,7 +392,7 @@ public class CanalEmbedSelector implements OtterSelector {
         Date date = new Date(time);
         SimpleDateFormat format = new SimpleDateFormat(DATE_FORMAT);
         return entry.getHeader().getLogfileName() + ":" + entry.getHeader().getLogfileOffset() + ":"
-               + entry.getHeader().getExecuteTime() + "(" + format.format(date) + ")";
+                + entry.getHeader().getExecuteTime() + "(" + format.format(date) + ")";
     }
 
     // ================== setter / getter ==================
