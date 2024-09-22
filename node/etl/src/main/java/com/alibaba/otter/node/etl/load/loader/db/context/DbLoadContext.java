@@ -19,6 +19,7 @@ package com.alibaba.otter.node.etl.load.loader.db.context;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import com.alibaba.otter.node.etl.load.loader.AbstractLoadContext;
 import com.alibaba.otter.shared.common.model.config.data.DataMediaSource;
@@ -34,12 +35,14 @@ public class DbLoadContext extends AbstractLoadContext<EventData> {
 
     private static final long serialVersionUID = -4851977997313104740L;
     private List<EventData>   lastProcessedDatas;                      // 上一轮的已录入的记录，可能会有多次失败需要合并多次已录入的数据
+    private List<EventData>   mergedDatas;
     private DataMediaSource   dataMediaSource;
 
     public DbLoadContext(){
         lastProcessedDatas = Collections.synchronizedList(new LinkedList<EventData>());
         prepareDatas = Collections.synchronizedList(new LinkedList<EventData>());
         processedDatas = Collections.synchronizedList(new LinkedList<EventData>());
+        mergedDatas = Collections.synchronizedList(new LinkedList<EventData>());
         failedDatas = Collections.synchronizedList(new LinkedList<EventData>());
     }
 
@@ -49,6 +52,14 @@ public class DbLoadContext extends AbstractLoadContext<EventData> {
 
     public void setLastProcessedDatas(List<EventData> lastProcessedDatas) {
         this.lastProcessedDatas = lastProcessedDatas;
+    }
+
+    public List<EventData> getMergedDatas() {
+        return mergedDatas;
+    }
+
+    public void setMergedDatas(List<EventData> mergedDatas) {
+        this.mergedDatas = mergedDatas;
     }
 
     public DataMediaSource getDataMediaSource() {

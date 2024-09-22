@@ -29,6 +29,7 @@
 		<property name="targetBeanName" value="dbLoadActionTarget" />
 	</bean>
 	<bean id="dbLoadActionTarget" class="com.alibaba.otter.node.etl.load.loader.db.DbLoadAction" scope="prototype">
+		<property name="batchSize" value="50" />
 		<property name="retry" value="3" />
 		<property name="retryWait" value="3000" />
 		<property name="poolSize" value="5" />

@@ -24,6 +24,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
+import com.alibaba.otter.node.etl.load.loader.db.context.DbLoadContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.util.CollectionUtils;
@@ -59,39 +60,46 @@ public class DbLoadMerger {
      * @param eventDatas
      * @return
      */
-    public static List<EventData> merge(List<EventData> eventDatas) {
+    public static List<EventData> merge(DbLoadContext context, List<EventData> eventDatas) {
         Map<RowKey, EventData> result = new LinkedHashMap<RowKey, EventData>();
         for (EventData eventData : eventDatas) {
-            merge(eventData, result);
+            final EventData oldEventData = merge(eventData, result);
+            if(oldEventData != null){
+                context.getMergedDatas().add(oldEventData);
+            }
         }
         return new LinkedList<EventData>(result.values());
     }
 
-    public static void merge(EventData eventData, Map<RowKey, EventData> result) {
+    public static EventData merge(EventData eventData, Map<RowKey, EventData> result) {
         EventType eventType = eventData.getEventType();
+        EventData oldEventData = null;
         switch (eventType) {
             case INSERT:
-                mergeInsert(eventData, result);
+                oldEventData = mergeInsert(eventData, result);
                 break;
             case UPDATE:
-                mergeUpdate(eventData, result);
+                oldEventData = mergeUpdate(eventData, result);
                 break;
             case DELETE:
-                mergeDelete(eventData, result);
+                oldEventData = mergeDelete(eventData, result);
                 break;
             default:
+                logger.error("数据将被丢弃：{}", eventData);
                 break;
         }
+        return oldEventData;
     }
 
-    private static void mergeInsert(EventData eventData, Map<RowKey, EventData> result) {
+    private static EventData mergeInsert(EventData eventData, Map<RowKey, EventData> result) {
         // insert无主键变更的处理
+        EventData oldEventData = null;
         RowKey rowKey = new RowKey(eventData.getTableId(), eventData.getSchemaName(), eventData.getTableName(),
                                    eventData.getKeys());
         if (!result.containsKey(rowKey)) {
             result.put(rowKey, eventData);
         } else {
-            EventData oldEventData = result.get(rowKey);
+            oldEventData = result.get(rowKey);
             eventData.setSize(oldEventData.getSize() + eventData.getSize());
             // 如果上一条变更是delete的，就直接用insert替换
             if (oldEventData.getEventType() == EventType.DELETE) {
@@ -108,11 +116,13 @@ public class DbLoadMerger {
                 result.put(rowKey, mergeEventData);
             }
         }
+        return oldEventData;
     }
 
-    private static void mergeUpdate(EventData eventData, Map<RowKey, EventData> result) {
+    private static EventData mergeUpdate(EventData eventData, Map<RowKey, EventData> result) {
         RowKey rowKey = new RowKey(eventData.getTableId(), eventData.getSchemaName(), eventData.getTableName(),
                                    eventData.getKeys());
+        EventData oldEventData = null;
         if (!CollectionUtils.isEmpty(eventData.getOldKeys())) {// 存在主键变更
             // 需要解决(1->2 , 2->3)级联主键变更的问题
             RowKey oldKey = new RowKey(eventData.getTableId(), eventData.getSchemaName(), eventData.getTableName(),
@@ -120,7 +130,7 @@ public class DbLoadMerger {
             if (!result.containsKey(oldKey)) {// 不需要级联
                 result.put(rowKey, eventData);
             } else {
-                EventData oldEventData = result.get(oldKey);
+                oldEventData = result.get(oldKey);
                 eventData.setSize(oldEventData.getSize() + eventData.getSize());
                 // 如果上一条变更是insert的，就把这一条的eventType改成insert，并且把上一条存在而这一条不存在的字段值拷贝到这一条中
                 if (oldEventData.getEventType() == EventType.INSERT) {
@@ -146,7 +156,7 @@ public class DbLoadMerger {
             if (!result.containsKey(rowKey)) {// 没有主键变更
                 result.put(rowKey, eventData);
             } else {
-                EventData oldEventData = result.get(rowKey);
+                oldEventData = result.get(rowKey);
                 // 如果上一条变更是insert的，就把这一条的eventType改成insert，并且把上一条存在而这一条不存在的字段值拷贝到这一条中
                 if (oldEventData.getEventType() == EventType.INSERT) {
                     eventData.setEventType(EventType.INSERT);
@@ -167,16 +177,18 @@ public class DbLoadMerger {
                 }
             }
         }
+        return oldEventData;
     }
 
-    private static void mergeDelete(EventData eventData, Map<RowKey, EventData> result) {
+    private static EventData mergeDelete(EventData eventData, Map<RowKey, EventData> result) {
         // 只保留pks，把columns去掉. 以后针对数据仓库可以开放delete columns记录
         RowKey rowKey = new RowKey(eventData.getTableId(), eventData.getSchemaName(), eventData.getTableName(),
                                    eventData.getKeys());
+        EventData oldEventData = null;
         if (!result.containsKey(rowKey)) {
             result.put(rowKey, eventData);
         } else {
-            EventData oldEventData = result.get(rowKey);
+            oldEventData = result.get(rowKey);
             eventData.setSize(oldEventData.getSize() + eventData.getSize());
             if (!CollectionUtils.isEmpty(oldEventData.getOldKeys())) {// 存在主键变更
                 // insert/update -> delete记录组合时，delete的对应的pk为上一条记录的pk
@@ -192,6 +204,7 @@ public class DbLoadMerger {
             }
 
         }
+        return oldEventData;
     }
 
     /**

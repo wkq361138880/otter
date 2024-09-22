@@ -17,37 +17,34 @@
 package com.alibaba.otter.node.etl.load.loader.db;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import com.alibaba.otter.shared.etl.model.EventData;
 import com.alibaba.otter.shared.etl.model.EventType;
+import com.google.common.collect.Lists;
 
 /**
  * 将同一个weight下的EventData进行数据归类,按表和insert/update/delete类型进行分类
- * 
+ *
  * <pre>
  * 归类用途：对insert语句进行batch优化
  * 1. mysql索引的限制，需要避免insert并发执行
  * </pre>
- * 
+ *
  * @author jianghang 2011-11-9 下午04:28:35
  * @version 4.0.0
  */
 public class DbLoadData {
 
-    private List<TableLoadData> tables = new ArrayList<TableLoadData>();
+    private Map<Long,TableLoadData> tableMap = new HashMap<>();
 
     public DbLoadData(){
         // nothing
     }
 
-    public DbLoadData(List<EventData> datas){
-        for (EventData data : datas) {
-            merge(data);
-        }
-    }
-
-    public void merge(EventData data) {
+    public boolean merge(EventData data) {
         TableLoadData tableData = findTableData(data.getTableId());
 
         EventType type = data.getEventType();
@@ -57,22 +54,22 @@ public class DbLoadData {
             tableData.getUpadateDatas().add(data);
         } else if (type.isDelete()) {
             tableData.getDeleteDatas().add(data);
+        } else {
+            return false;
         }
+        return true;
     }
 
     public List<TableLoadData> getTables() {
-        return tables;
+        return Lists.newArrayList(tableMap.values());
     }
 
     private synchronized TableLoadData findTableData(Long tableId) {
-        for (TableLoadData table : tables) {
-            if (table.getTableId().equals(tableId)) {
-                return table;
-            }
+        TableLoadData data = tableMap.get(tableId);
+        if(data == null){
+            data = new TableLoadData(tableId);
+            tableMap.put(tableId,data);
         }
-
-        TableLoadData data = new TableLoadData(tableId);
-        tables.add(data);
         return data;
     }
 
@@ -121,6 +118,5 @@ public class DbLoadData {
         public void setTableId(Long tableId) {
             this.tableId = tableId;
         }
-
     }
 }

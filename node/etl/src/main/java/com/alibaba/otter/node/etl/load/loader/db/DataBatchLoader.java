@@ -20,12 +20,10 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorCompletionService;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
+import java.util.concurrent.*;
 
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -56,7 +54,7 @@ import com.google.common.collect.OtterMigrateMap;
 
 /**
  * 针对RowData的数据载入实现
- * 
+ *
  * @author jianghang 2011-10-27 上午11:15:48
  * @version 4.0.0
  */
@@ -67,7 +65,13 @@ public class DataBatchLoader implements OtterLoader<DbBatch, List<LoadContext>>,
     private BeanFactory         beanFactory;
     private ConfigClientService configClientService;
     private LoadInterceptor     dbInterceptor;
+    /**
+     * DbLoadAction 缓存，key为pipelineId,每个pipeline对应一个DbLoadAction
+     */
+    private Cache<String,DbLoadAction> actionCache = CacheBuilder.newBuilder().maximumSize(100)
+            .expireAfterAccess(1,TimeUnit.HOURS).build();
 
+    @Override
     public List<LoadContext> load(DbBatch data) {
         final RowBatch rowBatch = data.getRowBatch();
         final FileBatch fileBatch = data.getFileBatch();
@@ -167,13 +171,14 @@ public class DataBatchLoader implements OtterLoader<DbBatch, List<LoadContext>>,
                                  final FileBatch fileBatch, final File rootDir, final WeightController controller) {
         futures.add(completionService.submit(new Callable<FileLoadContext>() {
 
+            @Override
             public FileLoadContext call() throws Exception {
                 try {
                     MDC.put(OtterConstants.splitPipelineLogFileKey,
                             String.valueOf(fileBatch.getIdentity().getPipelineId()));
 
                     FileLoadAction fileLoadAction = (FileLoadAction) beanFactory.getBean("fileLoadAction",
-                                                                                         FileLoadAction.class);
+                            FileLoadAction.class);
                     return fileLoadAction.load(fileBatch, rootDir, controller);
                 } finally {
                     MDC.remove(OtterConstants.splitPipelineLogFileKey);
@@ -182,19 +187,22 @@ public class DataBatchLoader implements OtterLoader<DbBatch, List<LoadContext>>,
         }));
     }
 
+
     private void submitRowBatch(List<Future> futures, ExecutorCompletionService completionService,
                                 final List<RowBatch> rowBatchs, final WeightController controller) {
         for (final RowBatch rowBatch : rowBatchs) {
             // 提交多个并行加载通道
             futures.add(completionService.submit(new Callable<DbLoadContext>() {
 
+                @Override
                 public DbLoadContext call() throws Exception {
                     try {
                         MDC.put(OtterConstants.splitPipelineLogFileKey,
                                 String.valueOf(rowBatch.getIdentity().getPipelineId()));
                         // dbLoadAction是一个pool池化对象
-                        DbLoadAction dbLoadAction = (DbLoadAction) beanFactory.getBean("dbLoadAction",
-                                                                                       DbLoadAction.class);
+                        DbLoadAction dbLoadAction = actionCache.get(String.valueOf(rowBatch.getIdentity().getPipelineId()),() -> {
+                            return (DbLoadAction) beanFactory.getBean("dbLoadAction", DbLoadAction.class);
+                        });
                         return dbLoadAction.load(rowBatch, controller);
                     } finally {
                         MDC.remove(OtterConstants.splitPipelineLogFileKey);
@@ -211,6 +219,7 @@ public class DataBatchLoader implements OtterLoader<DbBatch, List<LoadContext>>,
         final Identity identity = rowBatch.getIdentity();
         Map<DataMediaSource, RowBatch> result = OtterMigrateMap.makeComputingMap(new Function<DataMediaSource, RowBatch>() {
 
+            @Override
             public RowBatch apply(DataMediaSource input) {
                 RowBatch rowBatch = new RowBatch();
                 rowBatch.setIdentity(identity);
@@ -221,13 +230,14 @@ public class DataBatchLoader implements OtterLoader<DbBatch, List<LoadContext>>,
         for (EventData eventData : rowBatch.getDatas()) {
             // 获取介质信息
             DataMedia media = ConfigHelper.findDataMedia(configClientService.findPipeline(identity.getPipelineId()),
-                                                         eventData.getTableId());
+                    eventData.getTableId());
             result.get(media.getSource()).merge(eventData); // 归类
         }
 
         return new ArrayList<RowBatch>(result.values());
     }
 
+    @Override
     public void setBeanFactory(BeanFactory beanFactory) throws BeansException {
         this.beanFactory = beanFactory;
     }

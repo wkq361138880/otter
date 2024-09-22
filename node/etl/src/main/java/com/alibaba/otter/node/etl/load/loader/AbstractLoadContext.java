@@ -27,7 +27,7 @@ import com.alibaba.otter.shared.etl.model.Identity;
 
 /**
  * 类LoadContext.java的实现描述：TODO 类实现描述
- * 
+ *
  * @author simon 2012-7-3 下午2:22:51
  * @version 4.1.0
  */
@@ -40,11 +40,13 @@ public abstract class AbstractLoadContext<T> implements LoadContext, Serializabl
     protected List<T>         prepareDatas;                            // 准备处理的数据
     protected List<T>         processedDatas;                          // 已处理完成的数据
     protected List<T>         failedDatas;
+    protected List<T>         unefectDatas;//没有影响行数的数据
 
     public AbstractLoadContext(){
         this.prepareDatas = Collections.synchronizedList(new LinkedList<T>());
         this.processedDatas = Collections.synchronizedList(new LinkedList<T>());
         this.failedDatas = Collections.synchronizedList(new LinkedList<T>());
+        this.unefectDatas = Collections.synchronizedList(new LinkedList<T>());
     }
 
     public Identity getIdentity() {
@@ -85,6 +87,14 @@ public abstract class AbstractLoadContext<T> implements LoadContext, Serializabl
 
     public void setFailedDatas(List<T> failedDatas) {
         this.failedDatas = failedDatas;
+    }
+
+    public List<T> getUnefectDatas() {
+        return unefectDatas;
+    }
+
+    public void setUnefectDatas(List<T> unefectDatas) {
+        this.unefectDatas = unefectDatas;
     }
 
     public Pipeline getPipeline() {

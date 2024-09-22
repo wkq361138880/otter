@@ -18,9 +18,12 @@ package com.alibaba.otter.node.etl.load.loader.db.interceptor.log;
 
 import java.text.MessageFormat;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Date;
 import java.util.List;
 
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang.SystemUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,18 +37,18 @@ import com.alibaba.otter.shared.etl.model.EventData;
 
 /**
  * load的日志记录
- * 
+ *
  * @author jianghang 2011-11-10 上午11:31:05
  * @version 4.0.0
  */
 public class LogLoadInterceptor extends AbstractLoadInterceptor<DbLoadContext, EventData> {
 
-    private static final Logger logger           = LoggerFactory.getLogger(LogLoadInterceptor.class);
-    private static final String SEP              = SystemUtils.LINE_SEPARATOR;
-    private static final String TIMESTAMP_FORMAT = "yyyy-MM-dd HH:mm:ss:SSS";
-    private int                 batchSize        = 50;
-    private static String       context_format   = null;
-    private boolean             dump             = true;
+    private static final Logger logger = LoggerFactory.getLogger(LogLoadInterceptor.class);
+    private static final String SEP = SystemUtils.LINE_SEPARATOR;
+    public static final String TIMESTAMP_FORMAT = "yyyy-MM-dd HH:mm:ss:SSS";
+    private int batchSize = 50;
+    public static String context_format = null;
+    private boolean dump = true;
 
     static {
         context_format = "* status : {0}  , time : {1} *" + SEP;
@@ -56,7 +59,7 @@ public class LogLoadInterceptor extends AbstractLoadInterceptor<DbLoadContext, E
     public void commit(DbLoadContext context) {
         // 成功时记录一下
         boolean dumpThisEvent = context.getPipeline().getParameters().isDumpEvent()
-                                || context.getPipeline().getParameters().isDryRun();
+                || context.getPipeline().getParameters().isDryRun();
         if (dump && dumpThisEvent && logger.isInfoEnabled()) {
             synchronized (LogLoadInterceptor.class) {
                 try {
@@ -80,18 +83,27 @@ public class LogLoadInterceptor extends AbstractLoadInterceptor<DbLoadContext, E
 
     public void error(DbLoadContext context) {
         boolean dumpThisEvent = context.getPipeline().getParameters().isDumpEvent()
-                                || context.getPipeline().getParameters().isDryRun();
-        if (dump && dumpThisEvent && logger.isInfoEnabled()) {
+                || context.getPipeline().getParameters().isDryRun();
+        if (dump && dumpThisEvent && logger.isInfoEnabled() ) {
             synchronized (LogLoadInterceptor.class) {
                 try {
                     MDC.put(OtterConstants.splitPipelineLoadLogFileKey,
                             String.valueOf(context.getIdentity().getPipelineId()));
                     logger.info(dumpContextInfo("error", context));
-                    logger.info("* process Data  *" + SEP);
-                    logEventDatas(context.getProcessedDatas());
+                    if (dump && dumpThisEvent && logger.isInfoEnabled()) {
+                        logger.info("* process Data  *" + SEP);
+                        logEventDatas(context.getProcessedDatas());
+                    }
                     logger.info("-----------------" + SEP);
-                    logger.info("* failed Data *" + SEP);
+                    logger.error("* failed Data *" + SEP);
                     logEventDatas(context.getFailedDatas());
+                    if (context.getPrepareDatas().size() != context.getProcessedDatas().size() + context.getFailedDatas().size() + context.getMergedDatas().size() + context.getUnefectDatas().size()) {
+                        logger.error("* lost Data *" + SEP);
+                        Collection<EventData> lostEvents = CollectionUtils.subtract(context.getPrepareDatas(), context.getProcessedDatas());
+                        lostEvents = CollectionUtils.subtract(lostEvents, context.getFailedDatas());
+                        lostEvents = CollectionUtils.subtract(lostEvents, context.getUnefectDatas());
+                        logEventDatas(new ArrayList<>(lostEvents));
+                    }
                     logger.info("****************************************************" + SEP);
                 } finally {
                     MDC.remove(OtterConstants.splitPipelineLoadLogFileKey);
@@ -125,7 +137,7 @@ public class LogLoadInterceptor extends AbstractLoadInterceptor<DbLoadContext, E
         Date now = new Date();
         SimpleDateFormat format = new SimpleDateFormat(TIMESTAMP_FORMAT);
         return MessageFormat.format(context_format, status, format.format(now), context.getIdentity().toString(), all,
-                                    successed, failed, isInterrupt);
+                successed, failed, isInterrupt);
     }
 
     public void setDump(boolean dump) {
