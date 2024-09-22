@@ -23,7 +23,7 @@ package com.alibaba.otter.shared.common.model.config.data;
  * @version 4.1.0
  */
 public enum ExtensionDataType {
-    CLAZZ, SOURCE;
+    CLAZZ, SOURCE , OGNL;
 
     public boolean isClazz() {
         return this.equals(ExtensionDataType.CLAZZ);
@@ -31,5 +31,9 @@ public enum ExtensionDataType {
 
     public boolean isSource() {
         return this.equals(ExtensionDataType.SOURCE);
+    }
+
+    public boolean isOgnl() {
+        return this.equals(ExtensionDataType.OGNL);
     }
 }

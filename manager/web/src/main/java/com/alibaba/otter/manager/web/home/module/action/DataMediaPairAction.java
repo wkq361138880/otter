@@ -198,7 +198,7 @@ public class DataMediaPairAction {
         filterData.setExtensionDataType(filterType);
         if (filterType.isClazz()) {
             filterData.setClazzPath(dataMediaPairInfo.getField("filterText").getStringValue());
-        } else if (filterType.isSource()) {
+        } else if (filterType.isSource() || filterType.isOgnl()) {
             filterData.setSourceText(dataMediaPairInfo.getField("filterText").getStringValue());
         }
         dataMediaPair.setFilterData(filterData);

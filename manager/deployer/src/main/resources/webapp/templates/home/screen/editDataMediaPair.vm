@@ -82,6 +82,7 @@ function changeKeyword(id, name, local) {
         <select name="$dataMediaPairGroup.filterType.key" id="select">
 				<option value="CLAZZ" #if ($dataMediaPair.filterData.ExtensionDataType.isClazz()) selected="selected" #end>CLAZZ</option>
 				<option value="SOURCE" #if ($dataMediaPair.filterData.ExtensionDataType.isSource()) selected="selected" #end>SOURCE</option>
+				<option value="OGNL" #if ($dataMediaPair.filterData.ExtensionDataType.isOgnl()) selected="selected" #end>OGNL</option>
             </select><span class="red">*</span>
 			</td>
       </tr>

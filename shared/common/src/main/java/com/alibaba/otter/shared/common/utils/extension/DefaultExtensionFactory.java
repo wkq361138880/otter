@@ -25,6 +25,7 @@ import com.alibaba.otter.shared.common.utils.compile.impl.JdkCompiler;
 import com.alibaba.otter.shared.common.utils.compile.model.JavaSource;
 import com.alibaba.otter.shared.common.utils.extension.classpath.ClassScanner;
 import com.alibaba.otter.shared.common.utils.extension.exceptions.ExtensionLoadException;
+import org.springframework.util.ReflectionUtils;
 
 /**
  * @author jianghang 2012-11-7 下午02:11:46
@@ -62,6 +63,11 @@ public class DefaultExtensionFactory implements ExtensionFactory {
             JavaSource javaSource = new JavaSource(extensionData.getSourceText());
             clazz = jdkCompiler.compile(javaSource);
             fullname = "[" + javaSource.toString() + "]SourceText";
+        } else if (extensionData.getExtensionDataType().isOgnl()
+                && StringUtils.isNotBlank(extensionData.getSourceText())) {
+            String clazzName = "com.alibaba.otter.node.extend.processor.OgnlEventProcessor";
+            clazz = scan(clazzName);
+            fullname = "[" + clazzName + "]SourceText";
         }
 
         if (clazz == null) {
@@ -69,7 +75,11 @@ public class DefaultExtensionFactory implements ExtensionFactory {
         }
 
         try {
-            return clazz.newInstance();
+            final Object instance = clazz.newInstance();
+            if(instance != null && extensionData.getExtensionDataType().isOgnl()){
+                ReflectionUtils.invokeMethod(ReflectionUtils.findMethod(clazz,"setExpression"), instance, extensionData.getSourceText());
+            }
+            return instance;
         } catch (Exception e) {
             throw new ExtensionLoadException("ERROR ## classload this fileresolver=" + fullname + " has an error", e);
         }
